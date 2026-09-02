@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { CategoryIcon } from '../components/CategoryIcon';
 import { uploadToStorage } from '../lib/supabaseStorage';
+import { formatFRWDirect } from '../lib/constants';
 
 interface SuperAdminPageProps {
   onNavigate: (route: string) => void;
@@ -42,6 +43,7 @@ export const SuperAdminPage: React.FC<SuperAdminPageProps> = ({ onNavigate }) =>
     currentUser,
     isLoggedIn,
     isAdmin,
+    products,
     sellers,
     sellerApplications,
     orders,
@@ -49,6 +51,7 @@ export const SuperAdminPage: React.FC<SuperAdminPageProps> = ({ onNavigate }) =>
     suppliers,
     sourcingRequests,
     updateSourcingRequest,
+    deleteSourcingRequest,
     updateOrderStatus,
     deleteOrder,
     reviewSellerApplication,
@@ -83,6 +86,7 @@ export const SuperAdminPage: React.FC<SuperAdminPageProps> = ({ onNavigate }) =>
   const [viewAppModalItem, setViewAppModalItem] = useState<SellerApplication | null>(null);
   const [viewSellerModalItem, setViewSellerModalItem] = useState<Seller | null>(null);
   const [confirmDeleteSeller, setConfirmDeleteSeller] = useState<Seller | null>(null);
+  const [confirmDeleteRfq, setConfirmDeleteRfq] = useState<any | null>(null);
 
   // Category modal state with Parent/Child (Major Category & Subcategories)
   const [newCatName, setNewCatName] = useState('');
@@ -232,6 +236,12 @@ export const SuperAdminPage: React.FC<SuperAdminPageProps> = ({ onNavigate }) =>
     await deleteSeller(confirmDeleteSeller.id);
     setConfirmDeleteSeller(null);
     setViewSellerModalItem(null);
+  };
+
+  const handleDeleteRfqConfirm = async () => {
+    if (!confirmDeleteRfq) return;
+    await deleteSourcingRequest(confirmDeleteRfq.id);
+    setConfirmDeleteRfq(null);
   };
 
   return (
@@ -649,6 +659,11 @@ export const SuperAdminPage: React.FC<SuperAdminPageProps> = ({ onNavigate }) =>
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
+                          {rfq.rfq_number && (
+                            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-brand/10 text-brand">
+                              {rfq.rfq_number}
+                            </span>
+                          )}
                           <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-lg bg-secondary text-brand">
                             {rfq.tracking_code || `SHK-${rfq.id?.slice(0, 6).toUpperCase()}`}
                           </span>
@@ -664,7 +679,7 @@ export const SuperAdminPage: React.FC<SuperAdminPageProps> = ({ onNavigate }) =>
                           <p className="text-xs text-brand font-semibold mt-0.5">🏭 Assigned Factory: {rfq.supplier_name}</p>
                         )}
                         {rfq.quote_amount ? (
-                          <p className="text-xs text-emerald-600 font-semibold">💰 Quote: {formatPrice(rfq.quote_amount)}{rfq.quote_notes ? ` — ${rfq.quote_notes}` : ''}</p>
+                          <p className="text-xs text-emerald-600 font-semibold">💰 Quote: {formatFRWDirect(rfq.quote_amount)}{rfq.quote_notes ? ` — ${rfq.quote_notes}` : ''}</p>
                         ) : null}
                       </div>
                       <button
@@ -672,6 +687,13 @@ export const SuperAdminPage: React.FC<SuperAdminPageProps> = ({ onNavigate }) =>
                         className="px-5 py-2.5 rounded-xl brand-gradient text-white text-xs font-bold shadow-md hover:opacity-95 cursor-pointer whitespace-nowrap shrink-0"
                       >
                         Update Milestone
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteRfq(rfq)}
+                        className="px-3 py-2.5 rounded-xl bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 font-bold text-xs transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete</span>
                       </button>
                     </div>
 
@@ -1230,6 +1252,39 @@ export const SuperAdminPage: React.FC<SuperAdminPageProps> = ({ onNavigate }) =>
                 className="px-5 py-2 rounded-xl bg-rose-600 text-white font-bold shadow-md hover:bg-rose-700 transition-colors cursor-pointer"
               >
                 Yes, Delete Seller & Products
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ───────────────────────────────────────────────────────────── */}
+      {confirmDeleteRfq && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md p-6 bg-card border border-border rounded-3xl shadow-2xl space-y-4 text-foreground text-xs">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-600 flex items-center justify-center">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-bold text-base font-display text-foreground">
+                Delete RFQ {confirmDeleteRfq.rfq_number || confirmDeleteRfq.tracking_code}?
+              </h3>
+              <p className="text-muted-foreground leading-relaxed">
+                This will permanently remove this sourcing request and all its milestone history. This action cannot be undone.
+              </p>
+            </div>
+            <div className="flex gap-2 justify-end pt-3">
+              <button
+                onClick={() => setConfirmDeleteRfq(null)}
+                className="px-4 py-2 rounded-xl bg-secondary font-bold cursor-pointer hover:bg-border transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteRfqConfirm}
+                className="px-5 py-2 rounded-xl bg-rose-600 text-white font-bold shadow-md hover:bg-rose-700 transition-colors cursor-pointer"
+              >
+                Yes, Delete RFQ
               </button>
             </div>
           </div>

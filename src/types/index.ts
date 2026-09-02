@@ -196,8 +196,10 @@ export interface SourcingTrackingStep {
 
 export interface SourcingRequest {
   id: string;
+  rfq_number?: string;
   tracking_code: string;
   user_id?: string; // Add user_id for personalization
+  specifications?: string;
   customer_name: string;
   customer_phone: string;
   customer_email?: string;

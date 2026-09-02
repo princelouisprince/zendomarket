@@ -36,6 +36,20 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>(initialSearch || '');
   const [selectedSeller, setSelectedSeller] = useState<string>('all');
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 5000]);
+
+  // Dynamically size the price filter to the actual catalog so products aren't
+  // hidden by a hard-coded 5000 ceiling (FRW prices are typically in the tens of thousands).
+  const maxProductPrice = useMemo(() => {
+    const max = products.reduce(
+      (m, p) => Math.max(m, Number(p.discount_price || p.price) || 0),
+      0
+    );
+    return Math.max(5000, Math.ceil(max / 1000) * 1000);
+  }, [products]);
+
+  React.useEffect(() => {
+    setPriceRange((prev) => (prev[1] === 5000 ? [0, maxProductPrice] : prev));
+  }, [maxProductPrice]);
   const [inStockOnly, setInStockOnly] = useState<boolean>(false);
   const [minRating, setMinRating] = useState<number>(0);
   const [sortBy, setSortBy] = useState<'newest' | 'price-asc' | 'price-desc' | 'rating' | 'discount'>('newest');
@@ -161,7 +175,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     selectedSubcategory !== 'all' ||
     searchQuery !== '' ||
     selectedSeller !== 'all' ||
-    priceRange[1] < 5000 ||
+    priceRange[1] < maxProductPrice ||
     inStockOnly ||
     minRating > 0;
 
@@ -338,15 +352,15 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
             <input
               type="range"
               min={0}
-              max={5000}
-              step={50}
+              max={maxProductPrice}
+              step={Math.max(50, Math.round(maxProductPrice / 100))}
               value={priceRange[1]}
               onChange={(e) => setPriceRange([priceRange[0], Number(e.target.value)])}
               className="w-full accent-brand"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
               <span>{formatPrice(0)}</span>
-              <span>{formatPrice(5000)}+</span>
+              <span>{formatPrice(maxProductPrice)}+</span>
             </div>
           </div>
 

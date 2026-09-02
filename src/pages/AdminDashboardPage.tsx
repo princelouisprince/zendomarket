@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Supplier, SourcingRequest } from '../types';
-import { formatFRW } from '../lib/constants';
+import { formatFRW, formatFRWDirect } from '../lib/constants';
 import { SUPABASE_SQL_SCHEMA, SUPABASE_URL } from '../lib/supabaseMirror';
 import {
   ShieldAlert,
@@ -46,6 +46,7 @@ export const AdminDashboardPage: React.FC = () => {
     saveSupplier,
     deleteSupplier,
     updateSourcingRequest,
+    deleteSourcingRequest,
     updateCommissionRate,
     inviteAdmin,
     runSupabaseSync,
@@ -75,6 +76,7 @@ export const AdminDashboardPage: React.FC = () => {
 
   // Sourcing Quote Modal
   const [quoteModalReq, setQuoteModalReq] = useState<SourcingRequest | null>(null);
+  const [confirmDeleteRfq, setConfirmDeleteRfq] = useState<SourcingRequest | null>(null);
   const [quoteSupplierId, setQuoteSupplierId] = useState(suppliers[0]?.id || '');
   const [quoteAmount, setQuoteAmount] = useState<number>(0);
   const [quoteNotes, setQuoteNotes] = useState('');
@@ -489,7 +491,14 @@ export const AdminDashboardPage: React.FC = () => {
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-border text-xs">
                   <div>
-                    <span className="font-mono font-bold text-brand">{req.tracking_code}</span>
+                    <div className="flex items-center gap-2">
+                      {req.rfq_number && (
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-brand/10 text-brand">
+                          {req.rfq_number}
+                        </span>
+                      )}
+                      <span className="font-mono font-bold text-brand">{req.tracking_code}</span>
+                    </div>
                     <h3 className="font-bold text-sm text-foreground mt-0.5">{req.product_name}</h3>
                   </div>
                   <span className="px-2.5 py-1 rounded-full font-bold bg-brand/10 text-brand self-start sm:self-auto capitalize">
@@ -512,12 +521,19 @@ export const AdminDashboardPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex justify-end pt-2">
+                <div className="flex justify-end pt-2 gap-2">
                   <button
                     onClick={() => handleOpenQuoteModal(req)}
                     className="px-4 py-2 rounded-xl brand-gradient text-white text-xs font-bold shadow-sm"
                   >
                     Assign Supplier & Quote
+                  </button>
+                  <button
+                    onClick={() => setConfirmDeleteRfq(req)}
+                    className="px-3 py-2 rounded-xl bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 font-bold text-xs transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete</span>
                   </button>
                 </div>
               </div>
@@ -866,6 +882,42 @@ export const AdminDashboardPage: React.FC = () => {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Delete RFQ Confirmation */}
+      {confirmDeleteRfq && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md p-6 bg-card border border-border rounded-3xl shadow-2xl space-y-4 text-foreground text-xs">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-600 flex items-center justify-center">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-bold text-base font-display text-foreground">
+                Delete RFQ {confirmDeleteRfq.rfq_number || confirmDeleteRfq.tracking_code}?
+              </h3>
+              <p className="text-muted-foreground leading-relaxed">
+                This will permanently remove this sourcing request and all milestone history. This action cannot be undone.
+              </p>
+            </div>
+            <div className="flex gap-2 justify-end pt-3">
+              <button
+                onClick={() => setConfirmDeleteRfq(null)}
+                className="px-4 py-2 rounded-xl bg-secondary font-bold cursor-pointer hover:bg-border transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  await deleteSourcingRequest(confirmDeleteRfq.id);
+                  setConfirmDeleteRfq(null);
+                }}
+                className="px-5 py-2 rounded-xl bg-rose-600 text-white font-bold shadow-md hover:bg-rose-700 transition-colors cursor-pointer"
+              >
+                Yes, Delete RFQ
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

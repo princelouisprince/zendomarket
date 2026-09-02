@@ -15,6 +15,7 @@ import {
   Store,
   Package,
   ArrowRight,
+  ArrowLeft,
   LogOut,
   LogIn,
   Globe,
@@ -32,9 +33,11 @@ import { CurrencyCode } from '../types';
 interface NavbarProps {
   currentRoute: string;
   onNavigate: (route: string) => void;
+  onGoBack?: () => void;
+  canGoBack?: boolean;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ currentRoute, onNavigate }) => {
+export const Navbar: React.FC<NavbarProps> = ({ currentRoute, onNavigate, onGoBack, canGoBack }) => {
   const {
     currentUser,
     isLoggedIn,
@@ -222,6 +225,18 @@ export const Navbar: React.FC<NavbarProps> = ({ currentRoute, onNavigate }) => {
 
       {/* ── Main Navigation ──────────────────────────────────────────── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-[68px] flex items-center gap-4">
+
+        {/* Back button */}
+        {canGoBack && currentRoute !== '/' && (
+          <button
+            onClick={onGoBack}
+            aria-label="Go back"
+            title="Go back"
+            className="flex items-center justify-center w-9 h-9 rounded-xl bg-secondary text-foreground hover:bg-border/60 transition-colors shrink-0"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+        )}
 
         {/* Logo */}
         <div

@@ -123,6 +123,18 @@ export function formatFRW(amountInUSD: number, currencyCode?: CurrencyCode): str
   return formatCurrency(amountInUSD, currencyCode || 'USD');
 }
 
+/**
+ * Format an amount that is already in Rwandan Francs without any currency conversion.
+ * Use this for values that are stored/entered directly in FRW (e.g. sourcing quotes, budgets).
+ */
+export function formatFRWDirect(amount: number): string {
+  const value = Number(amount) || 0;
+  return `RWF ${new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(value)}`;
+}
+
 // -------------------------------------------------------------
 // International Countries & Country Codes
 // -------------------------------------------------------------

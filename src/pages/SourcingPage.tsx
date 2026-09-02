@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
+import { RFQ_PIPELINE, getMilestoneIndex } from '../lib/rfq';
+import { SUPPORT_WHATSAPP_NUMBER, formatFRWDirect } from '../lib/constants';
 import {
   Sparkles,
   Package,
@@ -10,7 +12,15 @@ import {
   ShieldCheck,
   Send,
   Globe,
-  Award
+  Award,
+  FileText,
+  Factory,
+  Quote,
+  Hammer,
+  Plane,
+  MapPin,
+  Search,
+  Trash2
 } from 'lucide-react';
 
 interface SourcingPageProps {
@@ -18,7 +28,7 @@ interface SourcingPageProps {
 }
 
 export const SourcingPage: React.FC<SourcingPageProps> = ({ onNavigate }) => {
-  const { sourcingRequests, createSourcingRequest, currentUser, isLoggedIn, isAdmin, formatPrice } = useStore();
+  const { sourcingRequests, createSourcingRequest, updateSourcingRequest, deleteSourcingRequest, currentUser, isLoggedIn, isAdmin, formatPrice } = useStore();
 
   const [activeTab, setActiveTab] = useState<'request' | 'track'>('request');
 
@@ -41,7 +51,9 @@ export const SourcingPage: React.FC<SourcingPageProps> = ({ onNavigate }) => {
   const [customerEmail, setCustomerEmail] = useState(currentUser.email || '');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [successCode, setSuccessCode] = useState<string | null>(null);
+  const [specifications, setSpecifications] = useState('');
+  const [successRfq, setSuccessRfq] = useState<{ rfq_number?: string; tracking_code: string } | null>(null);
+  const [trackInput, setTrackInput] = useState('');
 
   // East Africa sub-countries shown when region = East Africa
   const EAST_AFRICA_COUNTRIES = [
@@ -68,12 +80,13 @@ export const SourcingPage: React.FC<SourcingPageProps> = ({ onNavigate }) => {
         country: effectiveRegion,
         budget: Number(budget) || 0,
         description,
+        specifications,
         customer_name: customerName,
         customer_phone: customerPhone,
         customer_email: customerEmail
       });
 
-      setSuccessCode(created.tracking_code);
+      setSuccessRfq({ rfq_number: created.rfq_number, tracking_code: created.tracking_code });
       setProductName('');
       setDescription('');
       setBudget('');
@@ -96,10 +109,43 @@ export const SourcingPage: React.FC<SourcingPageProps> = ({ onNavigate }) => {
       cancelled: { label: 'Cancelled', color: 'bg-rose-500/10 text-rose-600' }
     };
     const s = map[status] || { label: status, color: 'bg-secondary text-muted-foreground' };
+  return (
+    <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${s.color}`}>
+      {s.label}
+    </span>
+  );
+  };
+
+  const PipelineRenderer: React.FC<{ currentStatus: string }> = ({ currentStatus }) => {
+    const currentIdx = getMilestoneIndex(currentStatus);
     return (
-      <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${s.color}`}>
-        {s.label}
-      </span>
+      <div className="space-y-3">
+        {RFQ_PIPELINE.map((milestone, idx) => {
+          const isDone = idx < currentIdx;
+          const isCurrent = idx === currentIdx;
+          const Icon =
+            milestone.icon === 'document' ? FileText :
+            milestone.icon === 'search' ? Search :
+            milestone.icon === 'quote' ? Quote :
+            milestone.icon === 'approved' ? Hammer :
+            milestone.icon === 'shipping' ? Plane :
+            milestone.icon === 'delivered' ? MapPin :
+            CheckCircle2;
+          return (
+            <div key={milestone.status} className={`flex items-start gap-3 text-xs ${isCurrent ? '' : 'opacity-70'}`}>
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${isDone || isCurrent ? 'bg-brand text-white shadow-sm shadow-brand/20' : 'bg-secondary text-muted-foreground border border-border'}`}>
+                <Icon className="w-3.5 h-3.5" />
+              </div>
+              <div className="flex-1">
+                <p className={`font-bold ${isCurrent ? 'text-foreground' : 'text-muted-foreground'}`}>{milestone.label}</p>
+                <p className="text-[11px] text-muted-foreground">{milestone.description}</p>
+              </div>
+              {isDone && <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />}
+              {isCurrent && <span className="text-[10px] font-mono text-brand shrink-0">Active</span>}
+            </div>
+          );
+        })}
+      </div>
     );
   };
 
@@ -249,12 +295,12 @@ export const SourcingPage: React.FC<SourcingPageProps> = ({ onNavigate }) => {
               </div>
 
               <div className="space-y-1.5">
-                <label className="font-bold text-foreground">Target Budget (in USD base)</label>
+                <label className="font-bold text-foreground">Target Budget (RWF)</label>
                 <input
                   type="number"
                   value={budget}
                   onChange={(e) => setBudget(e.target.value)}
-                  placeholder="e.g. $45,000"
+                  placeholder="e.g. 500,000 RWF"
                   className="w-full p-3 rounded-xl bg-secondary border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-brand font-mono"
                 />
               </div>
@@ -269,6 +315,19 @@ export const SourcingPage: React.FC<SourcingPageProps> = ({ onNavigate }) => {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Include motor power, material grade (SS304/SS316), CE/ISO certifications, international voltage (110V/220V/380V), lead time targets..."
+                  className="w-full p-3 rounded-xl bg-secondary border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-brand"
+                />
+              </div>
+
+              <div className="sm:col-span-2 space-y-1.5">
+                <label className="font-bold text-foreground">
+                  Additional Requirements (optional)
+                </label>
+                <textarea
+                  rows={3}
+                  value={specifications}
+                  onChange={(e) => setSpecifications(e.target.value)}
+                  placeholder="Packaging requirements, HS codes, certification documents, samples needed, etc."
                   className="w-full p-3 rounded-xl bg-secondary border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-brand"
                 />
               </div>
@@ -376,6 +435,61 @@ export const SourcingPage: React.FC<SourcingPageProps> = ({ onNavigate }) => {
             </span>
           </div>
 
+          {/* Confirmation card right after a fresh submission */}
+          {successRfq && (
+            <div className="p-5 rounded-3xl bg-emerald-500/10 border border-emerald-500/30 space-y-2">
+              <div className="flex items-center gap-2 text-emerald-700">
+                <CheckCircle2 className="w-5 h-5" />
+                <h4 className="font-bold text-sm">RFQ Dispatched Successfully</h4>
+              </div>
+              <p className="text-xs text-emerald-800/80">
+                Your request is now in the Kigali sourcing queue. Use the codes below to track live progress.
+              </p>
+              <div className="flex flex-wrap gap-4 pt-1 text-xs">
+                <div>
+                  <span className="text-muted-foreground block text-[10px] uppercase">RFQ Number</span>
+                  <span className="font-mono font-bold text-foreground">{successRfq.rfq_number || '—'}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block text-[10px] uppercase">Tracking Code</span>
+                  <span className="font-mono font-bold text-foreground">{successRfq.tracking_code}</span>
+                </div>
+                <button
+                  onClick={() => { setSuccessRfq(null); }}
+                  className="ml-auto px-3 py-1.5 rounded-lg bg-secondary text-foreground text-[11px] font-bold hover:bg-border"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Public code lookup — works for anyone, logged in or not */}
+          <div className="p-4 rounded-2xl bg-card border border-border flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex-1">
+              <h4 className="font-bold text-sm text-foreground">Track with a Code</h4>
+              <p className="text-[11px] text-muted-foreground">Enter your RFQ number or tracking code (e.g. <span className="font-mono">ZND-RFQ-123456</span> or <span className="font-mono">SHK-123456</span>).</p>
+            </div>
+            <form
+              onSubmit={(e) => { e.preventDefault(); if (trackInput.trim()) onNavigate(`/track?code=${encodeURIComponent(trackInput.trim().toUpperCase())}`); }}
+              className="flex gap-2 w-full sm:w-auto"
+            >
+              <input
+                type="text"
+                value={trackInput}
+                onChange={(e) => setTrackInput(e.target.value)}
+                placeholder="ZND-RFQ-… or SHK-…"
+                className="flex-1 sm:w-64 p-2.5 rounded-xl bg-secondary border border-border text-foreground text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand"
+              />
+              <button
+                type="submit"
+                className="px-4 py-2.5 rounded-xl brand-gradient text-white text-xs font-bold shadow-sm"
+              >
+                Track
+              </button>
+            </form>
+          </div>
+
           {!isLoggedIn && !isAdmin ? (
             <div className="p-12 rounded-3xl bg-card border border-border text-center space-y-4">
               <Globe className="w-12 h-12 text-brand mx-auto opacity-70" />
@@ -424,7 +538,12 @@ export const SourcingPage: React.FC<SourcingPageProps> = ({ onNavigate }) => {
                   {/* Header Row */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border">
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {req.rfq_number && (
+                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-brand/10 text-brand">
+                            {req.rfq_number}
+                          </span>
+                        )}
                         <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-secondary text-foreground">
                           {req.tracking_code}
                         </span>
@@ -438,10 +557,33 @@ export const SourcingPage: React.FC<SourcingPageProps> = ({ onNavigate }) => {
                     <div className="text-right sm:text-right">
                       <span className="text-[11px] text-muted-foreground block">Customer Target Budget</span>
                       <span className="text-base font-bold text-foreground font-display">
-                        {req.budget ? formatPrice(req.budget) : 'Open Quote'}
+                        {req.budget ? formatFRWDirect(req.budget) : 'Open Quote'}
                       </span>
                     </div>
                   </div>
+
+                  {/* 6-step RFQ pipeline */}
+                  <div className="p-4 rounded-2xl bg-secondary/40 border border-border">
+                    <h4 className="text-[11px] font-bold text-foreground uppercase tracking-wider mb-3">
+                      RFQ Pipeline Progress
+                    </h4>
+                    <PipelineRenderer currentStatus={req.status} />
+                  </div>
+
+                  {(req.status === 'quoted' || req.status === 'approved' || req.status === 'paid' || req.status === 'quality_check' || req.status === 'in_transit') && (
+                    <div className="p-4 rounded-2xl bg-brand/5 border border-brand/20 flex items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-xs font-bold text-foreground">Ready for your product?</h4>
+                        <p className="text-[11px] text-muted-foreground">Contact the assigned supplier to confirm production and delivery details.</p>
+                      </div>
+                      <button
+                        onClick={() => window.open(`https://wa.me/${SUPPORT_WHATSAPP_NUMBER}?text=${encodeURIComponent(`Hello ZENDO, I am contacting about RFQ ${req.rfq_number || req.tracking_code} for ${req.product_name}. I would like to discuss production and delivery details.`)}`, '_blank')}
+                        className="px-4 py-2 rounded-xl bg-emerald-500 text-white text-xs font-bold shadow-sm hover:bg-emerald-600 shrink-0"
+                      >
+                        Contact Supplier
+                      </button>
+                    </div>
+                  )}
 
                   {/* Details */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
@@ -456,7 +598,7 @@ export const SourcingPage: React.FC<SourcingPageProps> = ({ onNavigate }) => {
                     <div className="p-3 rounded-xl bg-secondary/50 space-y-0.5">
                       <span className="text-muted-foreground block text-[10px]">Quoted Amount</span>
                       <span className="font-bold text-foreground font-display">
-                        {req.quote_amount ? formatPrice(req.quote_amount) : 'Preparing quote...'}
+                        {req.quote_amount ? formatFRWDirect(req.quote_amount) : 'Preparing quote...'}
                       </span>
                     </div>
                   </div>
@@ -464,6 +606,11 @@ export const SourcingPage: React.FC<SourcingPageProps> = ({ onNavigate }) => {
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     <strong>Technical Scope:</strong> {req.description}
                   </p>
+                  {req.specifications && (
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      <strong>Extra Requirements:</strong> {req.specifications}
+                    </p>
+                  )}
 
                   {/* Stepper Tracking History */}
                   <div className="pt-4 border-t border-border space-y-3">
@@ -483,6 +630,19 @@ export const SourcingPage: React.FC<SourcingPageProps> = ({ onNavigate }) => {
                         </div>
                       ))}
                     </div>
+                  </div>
+                  <div className="pt-3 flex justify-end">
+                    <button
+                      onClick={() => {
+                        if (window.confirm(`Delete RFQ ${req.rfq_number || req.tracking_code}? This cannot be undone.`)) {
+                          deleteSourcingRequest(req.id);
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 font-bold text-xs transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete RFQ</span>
+                    </button>
                   </div>
                 </div>
               ))}

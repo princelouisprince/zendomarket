@@ -2,7 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Product, Seller } from '../types';
 import { uploadToStorage } from '../lib/supabaseStorage';
-import { RWANDA_DISTRICTS } from '../lib/constants';
+import { RWANDA_DISTRICTS, CURRENCIES } from '../lib/constants';
+
+// The app stores prices in a USD base; the marketplace operates in Rwandan Francs,
+// so seller-entered prices are FRW and converted to/from the USD base on save/edit.
+const RWF_RATE = CURRENCIES.RWF.exchangeRateFromUSD;
 import {
   Store,
   DollarSign,
@@ -43,8 +47,15 @@ export const SellerDashboardPage: React.FC<SellerDashboardPageProps> = ({ onNavi
     updateOrderStatus,
     deleteOrder,
     formatPrice,
-    showToast
+    showToast,
+    refreshData
   } = useStore();
+
+  // Always reflect the latest orders/products when the seller opens their dashboard
+  // (the global data load runs once at app start and won't include orders placed later).
+  React.useEffect(() => {
+    refreshData();
+  }, [refreshData]);
 
   const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'orders' | 'earnings' | 'settings'>('overview');
   const [confirmDeleteOrder, setConfirmDeleteOrder] = useState<any | null>(null);
@@ -75,9 +86,13 @@ export const SellerDashboardPage: React.FC<SellerDashboardPageProps> = ({ onNavi
     (p) => p.seller_user_id === currentUser.id
   );
 
-  const sellerOrders = orders.filter((o) =>
-    o.items.some((i) => i.seller_user_id === currentUser.id)
-  );
+  const sellerOrders = orders.filter((o) => {
+    const belongsToSeller =
+      o.items.some(
+        (i) => i.seller_user_id === currentUser.id || i.seller_id === currentSeller?.id
+      ) || (currentSeller && Array.isArray(o.seller_ids) && o.seller_ids.includes(currentSeller.id));
+    return belongsToSeller;
+  });
 
   // Financial calculations (100% direct revenue to merchant)
   const totalSalesRevenue = sellerOrders.reduce((acc, o) => acc + o.subtotal, 0);
@@ -130,8 +145,8 @@ export const SellerDashboardPage: React.FC<SellerDashboardPageProps> = ({ onNavi
     setProdDesc(p.description);
     setProdCatId(p.category_id);
     setProdSubcategory(p.subcategory || '');
-    setProdPrice(p.price);
-    setProdDiscount(p.discount_price || 0);
+    setProdPrice(Math.round((p.price || 0) * RWF_RATE));
+    setProdDiscount(Math.round((p.discount_price || 0) * RWF_RATE));
     setProdQuantity(p.quantity);
     setProdBrand(p.brand || '');
     setProdColor(p.color || '');
@@ -164,6 +179,13 @@ export const SellerDashboardPage: React.FC<SellerDashboardPageProps> = ({ onNavi
     const selectedCat = categories.find((c) => c.id === prodCatId);
     const autoSku = editingProduct?.sku || `ZND-${Date.now().toString().slice(-6)}`;
 
+    // Seller enters prices in FRW; convert to the USD base the app stores.
+    const priceUSD = Math.round((Number(prodPrice) / RWF_RATE) * 100) / 100;
+    const discountUSD =
+      prodDiscount && Number(prodDiscount) > 0
+        ? Math.round((Number(prodDiscount) / RWF_RATE) * 100) / 100
+        : undefined;
+
     if (editingProduct) {
       // Update existing
       await updateProduct(editingProduct.id, {
@@ -172,8 +194,8 @@ export const SellerDashboardPage: React.FC<SellerDashboardPageProps> = ({ onNavi
         category_id: prodCatId,
         category_name: selectedCat?.name || editingProduct.category_name,
         subcategory: prodSubcategory || undefined,
-        price: Number(prodPrice),
-        discount_price: prodDiscount ? Number(prodDiscount) : undefined,
+        price: priceUSD,
+        discount_price: discountUSD,
         quantity: Number(prodQuantity),
         sku: autoSku,
         brand: prodBrand,
@@ -192,8 +214,8 @@ export const SellerDashboardPage: React.FC<SellerDashboardPageProps> = ({ onNavi
         seller_name: currentSeller?.store_name || currentUser?.full_name || 'Verified Merchant',
         name: prodName,
         description: prodDesc,
-        price: Number(prodPrice),
-        discount_price: prodDiscount ? Number(prodDiscount) : undefined,
+        price: priceUSD,
+        discount_price: discountUSD,
         stock_quantity: Number(prodQuantity),
         sku: autoSku,
         brand: prodBrand,
@@ -408,11 +430,16 @@ export const SellerDashboardPage: React.FC<SellerDashboardPageProps> = ({ onNavi
                   </div>
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-2">
                   {order.items.map((item, idx) => (
-                    <div key={idx} className="flex justify-between text-muted-foreground">
-                      <span>{item.name} (x{item.quantity})</span>
-                      <span>{formatPrice(item.price * item.quantity)}</span>
+                    <div key={idx} className="flex items-center gap-3 text-muted-foreground">
+                      <img
+                        src={item.image || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=200&q=80'}
+                        alt={item.name}
+                        className="w-12 h-12 rounded-lg object-cover bg-secondary border border-border shrink-0"
+                      />
+                      <span className="flex-1 truncate">{item.name} (x{item.quantity})</span>
+                      <span className="shrink-0 font-semibold text-foreground">{formatPrice(item.price * item.quantity)}</span>
                     </div>
                   ))}
                 </div>
@@ -420,16 +447,22 @@ export const SellerDashboardPage: React.FC<SellerDashboardPageProps> = ({ onNavi
                 <div className="pt-2 border-t border-border flex items-center justify-between">
                   <span className="text-muted-foreground text-[11px]">Payment: {order.payment_method}</span>
                   <div className="flex items-center gap-2">
-                    {order.status !== 'confirmed' && order.status !== 'delivered' && (
-                      <button
-                        onClick={async () => {
-                          await updateOrderStatus(order.id, 'confirmed');
-                          showToast('Order Confirmed ✅', `Order #${order.order_number || order.tracking_code} confirmed.`, 'success');
+                    {!['delivered', 'cancelled'].includes(order.status) && (
+                      <select
+                        value={order.status}
+                        onChange={async (e) => {
+                          const newStatus = e.target.value;
+                          await updateOrderStatus(order.id, newStatus);
+                          showToast('Status Updated ✅', `Order #${order.order_number || order.tracking_code} marked as ${newStatus.replace('_', ' ')}.`, 'success');
                         }}
-                        className="px-4 py-1.5 rounded-xl brand-gradient text-white font-bold text-xs hover:opacity-95 shadow-sm transition-all cursor-pointer"
+                        className="px-3 py-1.5 rounded-xl bg-secondary border border-border text-foreground text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand cursor-pointer"
                       >
-                        Confirm Order
-                      </button>
+                        <option value="confirmed">✅ Confirm Order</option>
+                        <option value="ready">🚚 Ready to Deliver</option>
+                        <option value="shipped">✈️ Shipped</option>
+                        <option value="delivered">📦 Delivered</option>
+                        <option value="cancelled">❌ Cancel</option>
+                      </select>
                     )}
                     <button
                       onClick={() => setConfirmDeleteOrder(order)}

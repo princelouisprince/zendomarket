@@ -8,6 +8,7 @@ import {
   RWANDA_SECTORS,
   SUPPORT_WHATSAPP_LINK,
   SUPPORT_PHONE,
+  SUPPORT_PHONE_LOCAL,
   SUPPORT_WHATSAPP_NUMBER
 } from '../lib/constants';
 import confetti from 'canvas-confetti';
@@ -86,9 +87,20 @@ const CheckoutForm: React.FC<{ onNavigate: (r: string) => void }> = ({ onNavigat
   const [confirmedOrderCode, setConfirmedOrderCode] = useState<string | null>(null);
 
   const isMobileMoney = paymentMethod === 'MTN Mobile Money' || paymentMethod === 'Airtel Money';
-  const deliveryFee = isRwanda ? 2000 : 15000;
+  // Delivery is free — total is always the product amount only.
+  const deliveryFee = 0;
   const total = cartTotal + deliveryFee;
-  const ussdCode = paymentMethod === 'MTN Mobile Money' ? '*182*8*1*33715#' : '*185*8*1*33715#';
+
+  // Payment routes directly to the product's seller (MoMo push to the seller's code/number).
+  const orderSeller = sellers.find((s) =>
+    cart.some((i) => s.id === i.product.seller_id || s.user_id === i.product.seller_user_id)
+  );
+  const sellerPayCode =
+    orderSeller?.payment_phone_or_code?.replace(/\D/g, '') || SUPPORT_PHONE_LOCAL.replace(/\D/g, '');
+  const ussdCode =
+    paymentMethod === 'MTN Mobile Money'
+      ? `*182*8*1*${sellerPayCode}#`
+      : `*185*8*1*${sellerPayCode}#`;
 
   const buildFullAddress = () => {
     if (isRwanda) {
@@ -367,8 +379,8 @@ const CheckoutForm: React.FC<{ onNavigate: (r: string) => void }> = ({ onNavigat
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               {[
-                { id: 'MTN Mobile Money', icon: '📱', desc: 'USSD dial *182*8*1*33715# or MoMo App' },
-                { id: 'Airtel Money', icon: '📲', desc: 'USSD dial *185*8*1*33715# or Airtel App' },
+                { id: 'MTN Mobile Money', icon: '📱', desc: `USSD dial *182*8*1*${sellerPayCode}# or MoMo App` },
+                { id: 'Airtel Money', icon: '📲', desc: `USSD dial *185*8*1*${sellerPayCode}# or Airtel App` },
                 { id: 'Credit/Debit Card', icon: '💳', desc: 'Visa, Mastercard (secure checkout)' },
                 { id: 'Cash on Delivery', icon: '💵', desc: 'Pay our agent at your door upon delivery' }
               ].map((method) => (
@@ -475,7 +487,7 @@ const CheckoutForm: React.FC<{ onNavigate: (r: string) => void }> = ({ onNavigat
               </div>
               <div className="flex justify-between">
                 <span>Delivery to {selectedDistrict || selectedProvince || selectedCountry}</span>
-                <span className="font-semibold text-foreground">{formatPrice(deliveryFee)}</span>
+                <span className="font-semibold text-emerald-600">{deliveryFee > 0 ? formatPrice(deliveryFee) : 'Free'}</span>
               </div>
               {!isRwanda && (
                 <p className="text-[10px] text-amber-600 dark:text-amber-400">International delivery — shipping cost may vary.</p>

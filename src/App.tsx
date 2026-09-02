@@ -30,6 +30,7 @@ import { AuthPages } from './pages/AuthPages';
 
 export const MainApp: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<string>('/');
+  const [routeHistory, setRouteHistory] = useState<string[]>([]);
   const { darkMode } = useStore();
 
   // Apply/remove .dark class on <html> so Tailwind dark: variants work
@@ -48,7 +49,20 @@ export const MainApp: React.FC = () => {
   }, [currentRoute]);
 
   const handleNavigate = (route: string) => {
+    setRouteHistory((prev) => [...prev, currentRoute]);
     setCurrentRoute(route);
+  };
+
+  const handleGoBack = () => {
+    setRouteHistory((prev) => {
+      if (prev.length === 0) {
+        setCurrentRoute('/');
+        return prev;
+      }
+      const previous = prev[prev.length - 1];
+      setCurrentRoute(previous);
+      return prev.slice(0, -1);
+    });
   };
 
   const renderRoute = () => {
@@ -154,7 +168,7 @@ export const MainApp: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground transition-colors duration-200">
-      {!isAuthPage && <Navbar currentRoute={currentRoute} onNavigate={handleNavigate} />}
+      {!isAuthPage && <Navbar currentRoute={currentRoute} onNavigate={handleNavigate} onGoBack={handleGoBack} canGoBack={routeHistory.length > 0} />}
       
       <main className="flex-1">
         {renderRoute()}

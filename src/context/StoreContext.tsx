@@ -123,6 +123,8 @@ interface StoreContextType {
 
   createSourcingRequest: (reqData: any) => Promise<SourcingRequest | null>;
   updateSourcingRequest: (requestId: string, updates: { status?: string; supplier_name?: string; quote_amount?: number; quote_notes?: string; new_tracking_note?: string }) => Promise<boolean>;
+  deleteSourcingRequest: (requestId: string) => Promise<boolean>;
+  fetchSourcingRequestByCode: (code: string) => Promise<SourcingRequest | null>;
   addReview: (productId: string, rating: number, comment: string) => Promise<boolean>;
   markNotificationRead: (notificationId: string) => Promise<void>;
   createCategory: (name: string, description?: string, subcategories?: string[], imageUrl?: string) => Promise<Category | null>;
@@ -1014,7 +1016,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return null;
     } catch (error) {
       console.error('[StoreContext] Error creating order:', error);
-      showToast('Order Error', 'An error occurred while processing your order.', 'error');
+      showToast('Order Error', error instanceof Error ? error.message : 'An error occurred while processing your order.', 'error');
       return null;
     }
   };
@@ -1065,7 +1067,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return false;
     } catch (error) {
       console.error('[StoreContext] Error deleting order:', error);
-      showToast('Delete Error', 'An error occurred while deleting the order.', 'error');
+      showToast('Delete Error', error instanceof Error ? error.message : 'An error occurred while deleting the order.', 'error');
       return false;
     }
   };
@@ -1111,6 +1113,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return false;
       }
 
+      const target = sourcingRequests.find((r) => r.id === requestId);
       const ok = await api.updateSourcingRequest(requestId, updates);
       if (ok) {
         setSourcingRequests((prev) =>
@@ -1136,6 +1139,18 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             };
           })
         );
+
+        // Notify the customer (if they have a Supabase user account) that the
+        // milestone advanced so the in-app bell + RFQ tracker stay in sync.
+        if (target?.user_id && updates.status && updates.status !== target.status) {
+          api.createNotification(
+            target.user_id,
+            'rfq_milestone',
+            '📦 Sourcing Update',
+            `Your RFQ ${target.rfq_number || target.tracking_code} moved to "${updates.status}". ${updates.new_tracking_note || 'View your dashboard for details.'}`
+          );
+        }
+
         showToast('Sourcing Updated 🌐', 'Milestone and live tracking updated for client.', 'success');
         return true;
       }
@@ -1144,6 +1159,27 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch (error) {
       console.error('[StoreContext] Error updating sourcing request:', error);
       showToast('Update Error', 'An error occurred while updating the sourcing request.', 'error');
+      return false;
+    }
+  };
+
+  const deleteSourcingRequest = async (requestId: string): Promise<boolean> => {
+    try {
+      if (!requestId) {
+        showToast('Invalid Request', 'Request ID is required.', 'error');
+        return false;
+      }
+      const ok = await api.deleteSourcingRequest(requestId);
+      if (ok) {
+        setSourcingRequests((prev) => prev.filter((r) => r.id !== requestId));
+        showToast('RFQ Deleted 🗑️', 'Sourcing request removed permanently.', 'info');
+        return true;
+      }
+      showToast('Delete Failed', 'Could not delete sourcing request. Please try again.', 'error');
+      return false;
+    } catch (error) {
+      console.error('[StoreContext] Error deleting sourcing request:', error);
+      showToast('Delete Error', error instanceof Error ? error.message : 'An error occurred while deleting the sourcing request.', 'error');
       return false;
     }
   };
@@ -1371,6 +1407,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         createSourcingRequest,
         updateSourcingRequest,
+        deleteSourcingRequest,
+        fetchSourcingRequestByCode: (code: string) => api.fetchSourcingRequestByCode(code),
         addReview,
         markNotificationRead,
         createCategory,

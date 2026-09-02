@@ -21,8 +21,12 @@ import {
   Mail,
   Edit2,
   Save,
-  Store
+  Store,
+  Globe,
+  Trash2
 } from 'lucide-react';
+
+import { formatFRWDirect } from '../lib/constants';
 
 interface CustomerDashboardPageProps {
   onNavigate: (route: string) => void;
@@ -38,6 +42,8 @@ export const CustomerDashboardPage: React.FC<CustomerDashboardPageProps> = ({ on
     products,
     notifications,
     reviews,
+    sourcingRequests,
+    deleteSourcingRequest,
     formatPrice,
     logout,
     updateUserProfile,
@@ -47,7 +53,7 @@ export const CustomerDashboardPage: React.FC<CustomerDashboardPageProps> = ({ on
     toggleWishlist
   } = useStore();
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'orders' | 'wishlist' | 'cart' | 'notifications' | 'reviews'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'orders' | 'wishlist' | 'cart' | 'notifications' | 'reviews' | 'sourcing'>('profile');
 
   // Edit Profile State
   const [fullName, setFullName] = useState(currentUser.full_name || '');
@@ -213,7 +219,8 @@ export const CustomerDashboardPage: React.FC<CustomerDashboardPageProps> = ({ on
           { id: 'wishlist', label: `Wishlist (${myWishlistProducts.length})`, icon: <Heart className="w-4 h-4" /> },
           { id: 'cart', label: `Cart (${cart.length})`, icon: <ShoppingBag className="w-4 h-4" /> },
           { id: 'notifications', label: `Notifications (${notifications.length})`, icon: <Bell className="w-4 h-4" /> },
-          { id: 'reviews', label: `Reviews (${myReviews.length})`, icon: <Star className="w-4 h-4" /> }
+          { id: 'reviews', label: `Reviews (${myReviews.length})`, icon: <Star className="w-4 h-4" /> },
+          { id: 'sourcing', label: `Sourcing RFQs`, icon: <Globe className="w-4 h-4" /> }
         ].map((tab) => (
           <button
             key={tab.id}
@@ -321,9 +328,14 @@ export const CustomerDashboardPage: React.FC<CustomerDashboardPageProps> = ({ on
 
                 <div className="space-y-2">
                   {order.items.map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-xs">
-                      <span className="font-semibold">{item.name} (x{item.quantity})</span>
-                      <span className="font-mono font-bold text-foreground">{formatPrice(item.price * item.quantity)}</span>
+                    <div key={idx} className="flex items-center gap-3 text-xs">
+                      <img
+                        src={item.image || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=200&q=80'}
+                        alt={item.name}
+                        className="w-11 h-11 rounded-lg object-cover bg-secondary border border-border shrink-0"
+                      />
+                      <span className="font-semibold flex-1 truncate">{item.name} (x{item.quantity})</span>
+                      <span className="font-mono font-bold text-foreground shrink-0">{formatPrice(item.price * item.quantity)}</span>
                     </div>
                   ))}
                 </div>
@@ -479,6 +491,124 @@ export const CustomerDashboardPage: React.FC<CustomerDashboardPageProps> = ({ on
                 <p className="text-muted-foreground leading-relaxed">{r.comment}</p>
               </div>
             ))
+          )}
+        </div>
+      )}
+
+      {/* TAB: Sourcing RFQs */}
+      {activeTab === 'sourcing' && (
+        <div className="space-y-4">
+          <div className="p-4 rounded-2xl bg-card border border-border flex items-center justify-between">
+            <h3 className="text-sm font-bold font-display text-foreground">My Sourcing RFQs</h3>
+            <span className="text-xs text-muted-foreground font-mono">
+              {sourcingRequests.filter((r) => r.user_id === currentUser.id).length} request(s)
+            </span>
+          </div>
+          {sourcingRequests.filter((r) => r.user_id === currentUser.id).length === 0 ? (
+            <div className="p-10 rounded-3xl bg-card border border-border text-center text-xs text-muted-foreground space-y-2">
+              <Globe className="w-8 h-8 text-brand mx-auto opacity-70" />
+              <p className="font-bold text-foreground">No sourcing requests yet</p>
+              <p>Submit a global RFQ and track its milestone progress here.</p>
+              <button
+                onClick={() => onNavigate('/sourcing')}
+                className="px-5 py-2.5 rounded-xl brand-gradient text-white text-xs font-bold shadow-md"
+              >
+                Submit Global RFQ
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-6">
+              {sourcingRequests
+                .filter((r) => r.user_id === currentUser.id)
+                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                .map((req) => (
+                  <div key={req.id} className="p-5 rounded-3xl bg-card border border-border shadow-sm space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border">
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {req.rfq_number && (
+                            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-brand/10 text-brand">
+                              {req.rfq_number}
+                            </span>
+                          )}
+                          <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-secondary text-foreground">
+                            {req.tracking_code}
+                          </span>
+                          <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                            req.status === 'delivered'
+                              ? 'bg-emerald-500/10 text-emerald-600'
+                              : req.status === 'cancelled'
+                              ? 'bg-rose-500/10 text-rose-600'
+                              : 'bg-brand/10 text-brand'
+                          }`}>
+                            {req.status?.replace('_', ' ') || 'requested'}
+                          </span>
+                        </div>
+                        <h3 className="text-base font-bold font-display text-foreground mt-1.5">{req.product_name}</h3>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[11px] text-muted-foreground block">Target Budget</span>
+                        <span className="text-base font-bold text-foreground font-display">
+                          {req.budget ? formatPrice(req.budget) : 'Open Quote'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                      <div className="p-3 rounded-xl bg-secondary/50 space-y-0.5">
+                        <span className="text-muted-foreground block text-[10px]">Volume</span>
+                        <span className="font-bold text-foreground">{req.quantity} {req.unit}</span>
+                      </div>
+                      <div className="p-3 rounded-xl bg-secondary/50 space-y-0.5">
+                        <span className="text-muted-foreground block text-[10px]">Supplier</span>
+                        <span className="font-bold text-brand">{req.supplier_name || 'Pending matching'}</span>
+                      </div>
+                      <div className="p-3 rounded-xl bg-secondary/50 space-y-0.5">
+                        <span className="text-muted-foreground block text-[10px]">Quoted Amount</span>
+                        <span className="font-bold text-foreground font-display">
+                          {req.quote_amount ? formatFRWDirect(req.quote_amount) : 'Preparing quote...'}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      <strong>Technical Scope:</strong> {req.description}
+                    </p>
+                    {req.specifications && (
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        <strong>Extra Requirements:</strong> {req.specifications}
+                      </p>
+                    )}
+                    <div className="pt-4 border-t border-border space-y-2">
+                      <h4 className="text-[11px] font-bold text-foreground uppercase tracking-wider">Milestone Log</h4>
+                      <div className="space-y-2">
+                        {(req.tracking || []).map((step: any, idx: number) => (
+                          <div key={idx} className="flex items-start gap-3 text-xs">
+                            <div className="w-2.5 h-2.5 rounded-full bg-brand shrink-0 mt-1.5" />
+                            <div className="flex-1">
+                              <p className="font-semibold text-foreground">{step.note}</p>
+                              <span className="text-[10px] text-muted-foreground font-mono">
+                                {new Date(step.timestamp).toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="pt-3 flex justify-end">
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Delete RFQ ${req.rfq_number || req.tracking_code}? This cannot be undone.`)) {
+                            deleteSourcingRequest(req.id);
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 font-bold text-xs transition-colors flex items-center gap-1 cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete RFQ</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+            </div>
           )}
         </div>
       )}

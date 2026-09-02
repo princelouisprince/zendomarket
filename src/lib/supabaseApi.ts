@@ -708,14 +708,15 @@ export async function createProduct(productData: {
       payload.category_id = productData.category_id;
     }
 
-    const { data: inserted, error } = await supabase
+    const { data: insertedRows, error } = await supabase
       .from('products')
       .insert(payload)
-      .select()
-      .single();
+      .select();
 
-    if (error) {
-      console.warn('[SupabaseApi] createProduct notice:', error.message);
+    const inserted = Array.isArray(insertedRows) ? insertedRows[0] : insertedRows;
+
+    if (error || !inserted) {
+      console.warn('[SupabaseApi] createProduct notice:', error?.message);
       // Fallback object to ensure seller sees product in local state immediately
       const fallbackProd: Product = {
         id: `prod-${Date.now()}`,
@@ -743,34 +744,39 @@ export async function createProduct(productData: {
       return fallbackProd;
     }
 
-    // Send notification to superadmin(s) about new product requiring approval
-    if (productData.status === 'pending_review' || !productData.status) {
-      const { data: superadmins } = await supabase
-        .from('profiles')
-        .select('id')
-        .in('role', ['admin', 'super_admin']);
+    // Send notification to superadmin(s) about new product requiring approval.
+    // Side-effects are isolated so they can never break product creation.
+    try {
+      if (productData.status === 'pending_review' || !productData.status) {
+        const { data: superadmins } = await supabase
+          .from('profiles')
+          .select('id')
+          .in('role', ['admin', 'super_admin']);
 
-      if (superadmins && superadmins.length > 0) {
-        for (const admin of superadmins) {
-          await createNotification(
-            admin.id,
-            'new_product_pending_review',
-            '📦 New Product Pending Review',
-            `A new product "${productData.name}" from ${productData.seller_name || 'a seller'} is pending review. Please review in the Super Admin dashboard.`
-          ).catch(() => {});
+        if (superadmins && superadmins.length > 0) {
+          for (const admin of superadmins) {
+            await createNotification(
+              admin.id,
+              'new_product_pending_review',
+              '📦 New Product Pending Review',
+              `A new product "${productData.name}" from ${productData.seller_name || 'a seller'} is pending review. Please review in the Super Admin dashboard.`
+            ).catch(() => {});
+          }
         }
       }
-    }
 
-    // Insert image records into 'product_images' table if available
-    if (inserted && productData.images && productData.images.length > 0) {
-      const imgPayloads = productData.images.map((url, idx) => ({
-        product_id: inserted.id,
-        image_url: url,
-        is_primary: idx === 0,
-        sort_order: idx
-      }));
-      await supabase.from('product_images').insert(imgPayloads).catch(() => {});
+      // Insert image records into 'product_images' table if available
+      if (inserted && productData.images && productData.images.length > 0) {
+        const imgPayloads = productData.images.map((url, idx) => ({
+          product_id: inserted.id,
+          image_url: url,
+          is_primary: idx === 0,
+          sort_order: idx
+        }));
+        await supabase.from('product_images').insert(imgPayloads);
+      }
+    } catch (sideEffectErr) {
+      console.warn('[SupabaseApi] createProduct side-effects skipped:', sideEffectErr);
     }
 
     return mapDbProducts([inserted])[0];
@@ -1244,7 +1250,7 @@ export async function createOrder(payload: {
     const sellerIds = Array.from(new Set(payload.items.map((i) => i.seller_id).filter(Boolean)));
 
     // 1. Insert into 'orders'
-    const { data: order, error: orderErr } = await supabase
+    const { data: insertedRows, error: orderErr } = await supabase
       .from('orders')
       .insert({
         user_id: payload.user_id,
@@ -1269,12 +1275,15 @@ export async function createOrder(payload: {
         items: payload.items,
         seller_ids: sellerIds
       })
-      .select()
-      .single();
+      .select();
+
+    // Avoid .single() — it throws if the insert returns 0 rows to the client,
+    // which would otherwise surface as a generic "Order Failed".
+    const order = Array.isArray(insertedRows) ? insertedRows[0] : insertedRows;
 
     if (orderErr || !order) {
       console.error('[SupabaseApi] createOrder error:', orderErr?.message);
-      return null;
+      throw new Error(orderErr?.message || 'Order insert failed');
     }
 
     // 2. Insert into 'order_items' — skip items with non-UUID product IDs (local/fallback IDs)
@@ -1291,7 +1300,7 @@ export async function createOrder(payload: {
         subtotal: item.price * item.quantity
       }));
     if (validOrderItems.length > 0) {
-      await supabase.from('order_items').insert(validOrderItems).catch(() => {});
+      await supabase.from('order_items').insert(validOrderItems);
     }
 
     // 3. Record in 'payments' — only if user has a real session
@@ -1305,8 +1314,7 @@ export async function createOrder(payload: {
           payment_method: payload.payment_method,
           transaction_reference: `TXN-${Date.now()}`,
           status: 'completed'
-        })
-        .catch(() => {});
+        });
     }
 
     // 4. Calculate and record commissions (only for valid UUID seller IDs)
@@ -1327,11 +1335,10 @@ export async function createOrder(payload: {
           commission_amount: commissionAmount,
           seller_amount: sellerAmount,
           status: 'pending'
-        })
-        .catch(() => {});
+        });
     }
 
-    // 5. Send notification only for authenticated users
+    // 5. Notify the buyer (authenticated users only)
     if (payload.user_id && UUID_REGEX.test(payload.user_id)) {
       await createNotification(
         payload.user_id,
@@ -1341,10 +1348,20 @@ export async function createOrder(payload: {
       ).catch(() => {});
     }
 
+    // 6. Notify every product's seller/owner so the order is directed to them
+    for (const sId of validSellerIds) {
+      await createNotification(
+        sId,
+        'new_order',
+        '📦 New Order Received!',
+        `You have a new order #${orderNumber} for ${payload.total.toLocaleString()} FRW. Review it in your Seller Dashboard.`
+      ).catch(() => {});
+    }
+
     return mapDbOrders([order])[0];
   } catch (err) {
     console.error('[SupabaseApi] createOrder exception:', err);
-    return null;
+    throw err instanceof Error ? err : new Error(String(err));
   }
 }
 
@@ -1388,10 +1405,10 @@ export async function updateOrderStatus(orderId: string, status: string): Promis
 
 export async function deleteOrder(orderId: string): Promise<boolean> {
   try {
-    // Delete associated sub-records first
-    await supabase.from('order_items').delete().eq('order_id', orderId).catch(() => {});
-    await supabase.from('payments').delete().eq('order_id', orderId).catch(() => {});
-    await supabase.from('commissions').delete().eq('order_id', orderId).catch(() => {});
+    // Delete associated sub-records first (order_items cascades, but be explicit)
+    await supabase.from('order_items').delete().eq('order_id', orderId);
+    await supabase.from('payments').delete().eq('order_id', orderId);
+    await supabase.from('commissions').delete().eq('order_id', orderId);
 
     const { error } = await supabase
       .from('orders')
@@ -1400,12 +1417,12 @@ export async function deleteOrder(orderId: string): Promise<boolean> {
 
     if (error) {
       console.error('[SupabaseApi] deleteOrder error:', error.message);
-      return false;
+      throw new Error(error.message);
     }
     return true;
   } catch (err) {
     console.error('[SupabaseApi] deleteOrder exception:', err);
-    return false;
+    throw err instanceof Error ? err : new Error(String(err));
   }
 }
 
@@ -1729,12 +1746,29 @@ export async function createSourcingRequest(data: {
   customer_name: string;
   customer_phone: string;
   customer_email: string;
+  specifications?: string;
 }): Promise<SourcingRequest | null> {
   try {
-    const { data: inserted, error } = await supabase
+    const { rfqNumber, generateRfqNumber, generateTrackingCode } = await import('./rfq');
+    const rfq_number = rfqNumber || generateRfqNumber();
+    const tracking_code = generateTrackingCode();
+
+    const { data: insertedRows, error } = await supabase
       .from('sourcing_requests')
       .insert({
-        ...data,
+        user_id: data.user_id || null,
+        product_name: data.product_name,
+        quantity: String(data.quantity || 1),
+        unit: data.unit,
+        country: data.country,
+        budget: data.budget,
+        description: data.description,
+        customer_name: data.customer_name,
+        customer_phone: data.customer_phone,
+        customer_email: data.customer_email,
+        specifications: data.specifications || null,
+        rfq_number,
+        tracking_code,
         status: 'requested',
         tracking: [
           {
@@ -1744,17 +1778,19 @@ export async function createSourcingRequest(data: {
           }
         ]
       })
-      .select()
-      .single();
+      .select();
+
+    const inserted = Array.isArray(insertedRows) ? insertedRows[0] : insertedRows;
 
     if (error || !inserted) {
       console.error('[SupabaseApi] createSourcingRequest error:', error?.message);
-      return null;
+      throw new Error(error?.message || 'Sourcing request insert failed');
     }
 
     return {
       id: inserted.id,
-      tracking_code: `SHK-${inserted.id.slice(0, 6).toUpperCase()}`,
+      rfq_number: inserted.rfq_number || rfq_number,
+      tracking_code: inserted.tracking_code || tracking_code,
       user_id: inserted.user_id,
       product_name: inserted.product_name,
       quantity: Number(inserted.quantity || 1),
@@ -1762,13 +1798,14 @@ export async function createSourcingRequest(data: {
       country: inserted.country || 'Global',
       budget: Number(inserted.budget || 0),
       description: inserted.description || '',
+      specifications: inserted.specifications || undefined,
       status: inserted.status as any,
       tracking: inserted.tracking || [],
       created_at: inserted.created_at
     };
   } catch (err) {
     console.error('[SupabaseApi] createSourcingRequest exception:', err);
-    return null;
+    throw err instanceof Error ? err : new Error(String(err));
   }
 }
 
@@ -1823,6 +1860,65 @@ export async function updateSourcingRequest(
   }
 }
 
+export async function deleteSourcingRequest(requestId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('sourcing_requests')
+      .delete()
+      .eq('id', requestId);
+
+    if (error) {
+      console.error('[SupabaseApi] deleteSourcingRequest error:', error.message);
+      throw new Error(error.message);
+    }
+    return true;
+  } catch (err) {
+    console.error('[SupabaseApi] deleteSourcingRequest exception:', err);
+    throw err instanceof Error ? err : new Error(String(err));
+  }
+}
+
+/**
+ * Public RFQ lookup — used by the Track page so anyone (logged in or not) can
+ * look up the live status of a sourcing request by either its RFQ number or
+ * the customer-facing tracking code.
+ */
+export async function fetchSourcingRequestByCode(code: string): Promise<SourcingRequest | null> {
+  try {
+    const normalized = (code || '').trim().toUpperCase();
+    if (!normalized) return null;
+    const { data, error } = await supabase
+      .from('sourcing_requests')
+      .select('*')
+      .or(`rfq_number.eq.${normalized},tracking_code.eq.${normalized}`)
+      .maybeSingle();
+    if (error) {
+      console.error('[SupabaseApi] fetchSourcingRequestByCode error:', error.message);
+      return null;
+    }
+    if (!data) return null;
+    return {
+      id: data.id,
+      rfq_number: data.rfq_number,
+      tracking_code: data.tracking_code,
+      user_id: data.user_id,
+      product_name: data.product_name,
+      quantity: Number(data.quantity || 1),
+      unit: data.unit || 'Units',
+      country: data.country || 'Global',
+      budget: Number(data.budget || 0),
+      description: data.description || '',
+      specifications: data.specifications || undefined,
+      status: data.status,
+      tracking: Array.isArray(data.tracking) ? data.tracking : [],
+      created_at: data.created_at
+    };
+  } catch (err) {
+    console.error('[SupabaseApi] fetchSourcingRequestByCode exception:', err);
+    return null;
+  }
+}
+
 // -------------------------------------------------------------
 // 11. AUDIT LOGS & PLATFORM SETTINGS
 // -------------------------------------------------------------
@@ -1843,8 +1939,7 @@ export async function createAuditLog(
         target_id: targetId,
         metadata: metadata || {},
         user_id: userId
-      })
-      .catch(() => {});
+      });
   } catch {}
 }
 
