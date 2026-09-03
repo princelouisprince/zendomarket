@@ -884,7 +884,7 @@ export const INITIAL_ORDERS: Order[] = [
     tracking_code: 'ZND-EXP-90214',
     customer_name: 'Zendo Global Admin',
     customer_phone: '+1 (800) 842-9363',
-    customer_email: 'zendogroup.limited@gmail.com',
+    customer_email: 'admin@example.com',
     delivery_name: 'Zendo Global Logistics Hub',
     delivery_phone: '+1 (800) 842-9363',
     country: 'United States',
@@ -919,7 +919,7 @@ export const INITIAL_ORDERS: Order[] = [
 export const DEMO_USERS = [
   {
     id: '976d1d09-c8bd-4d57-916e-f68a3e1e9337',
-    email: 'zendogroup.limited@gmail.com',
+    email: 'admin@example.com',
     full_name: 'Zendo Global Admin',
     role: 'admin' as const,
     phone: '+1 (800) 842-9363',

@@ -385,13 +385,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         });
       }
 
-      const isSuperAdminEmail =
-        sessionUser.email?.toLowerCase() === 'zendogroup.limited@gmail.com' ||
-        sessionUser.email?.toLowerCase().includes('zendogroup') ||
-        sessionUser.email?.toLowerCase() === 'admin@zendo.rw' ||
-        sessionUser.email?.toLowerCase() === 'prince@zendo.rw';
-
-      const role = isSuperAdminEmail ? 'super_admin' : (profile?.role || 'customer');
+      const role = profile?.role || 'customer';
       const isUserAdmin = role === 'admin' || role === 'super_admin';
       const userObj: User = {
         id: sessionUser.id,

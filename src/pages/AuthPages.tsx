@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Lock, Mail, User, ShieldAlert, ArrowRight, CheckCircle2, Sparkles, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { Lock, Mail, User, ArrowRight, CheckCircle2, Sparkles, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 interface AuthPagesProps {
   initialMode?: 'login' | 'register' | 'forgot';
@@ -58,13 +58,6 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialMode = 'login', onN
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleFillAdmin = () => {
-    setEmail('zendogroup.limited@gmail.com');
-    setPassword('Alain@2025!');
-    setMode('login');
-    setErrorMsg(null);
   };
 
   return (
@@ -234,24 +227,6 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialMode = 'login', onN
             </p>
           )}
         </div>
-      </div>
-
-      {/* Admin Quick Fill Helper */}
-      <div className="p-4 rounded-2xl bg-secondary/50 border border-border flex items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-2.5">
-          <ShieldAlert className="w-4 h-4 text-brand shrink-0" />
-          <div>
-            <span className="font-bold text-foreground block">Admin Login Credentials</span>
-            <span className="text-[11px] text-muted-foreground font-mono">zendogroup.limited@gmail.com</span>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={handleFillAdmin}
-          className="px-3 py-1.5 rounded-xl bg-card hover:bg-brand/10 hover:text-brand border border-border text-[11px] font-bold transition-colors shrink-0"
-        >
-          Auto-fill
-        </button>
       </div>
     </div>
   );
