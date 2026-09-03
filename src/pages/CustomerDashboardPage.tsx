@@ -4,7 +4,6 @@ import { uploadToStorage } from '../lib/supabaseStorage';
 import {
   User,
   Package,
-  Heart,
   ShoppingBag,
   Bell,
   Star,
@@ -37,7 +36,6 @@ export const CustomerDashboardPage: React.FC<CustomerDashboardPageProps> = ({ on
     currentUser,
     isLoggedIn,
     orders,
-    wishlist,
     cart,
     products,
     notifications,
@@ -50,15 +48,17 @@ export const CustomerDashboardPage: React.FC<CustomerDashboardPageProps> = ({ on
     markNotificationRead,
     showToast,
     removeFromCart,
-    toggleWishlist
   } = useStore();
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'orders' | 'wishlist' | 'cart' | 'notifications' | 'reviews' | 'sourcing'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'orders' | 'cart' | 'notifications' | 'reviews' | 'sourcing'>('profile');
 
   // Edit Profile State
   const [fullName, setFullName] = useState(currentUser.full_name || '');
   const [phone, setPhone] = useState(currentUser.phone || '');
   const [avatarUrl, setAvatarUrl] = useState(currentUser.avatar || '');
+  const [avatarPosX, setAvatarPosX] = useState(50);
+  const [avatarPosY, setAvatarPosY] = useState(50);
+  const [avatarZoom, setAvatarZoom] = useState(1);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
@@ -70,7 +70,7 @@ export const CustomerDashboardPage: React.FC<CustomerDashboardPageProps> = ({ on
         </div>
         <h1 className="text-2xl font-bold font-display text-foreground">Sign In to Your Account</h1>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Access your personal profile, delivery tracking across Rwanda, saved wishlist, and active orders.
+          Access your personal profile, delivery tracking across Rwanda, and active orders.
         </p>
         <div className="flex items-center justify-center gap-3 pt-2">
           <button
@@ -94,7 +94,6 @@ export const CustomerDashboardPage: React.FC<CustomerDashboardPageProps> = ({ on
   const myOrders = orders.filter(
     (o) => o.user_id === currentUser.id || (currentUser.email && o.customer_email?.toLowerCase() === currentUser.email.toLowerCase())
   );
-  const myWishlistProducts = products.filter((p) => wishlist.includes(p.id));
   const myReviews = reviews.filter((r) => r.user_id === currentUser.id);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -105,6 +104,9 @@ export const CustomerDashboardPage: React.FC<CustomerDashboardPageProps> = ({ on
       const res = await uploadToStorage('avatars', file);
       if (res.url) {
         setAvatarUrl(res.url);
+        setAvatarPosX(50);
+        setAvatarPosY(50);
+        setAvatarZoom(1);
         await updateUserProfile({ avatar_url: res.url });
         showToast('Avatar Uploaded', 'Your profile picture has been updated in Supabase Storage.', 'success');
       } else {
@@ -154,9 +156,6 @@ export const CustomerDashboardPage: React.FC<CustomerDashboardPageProps> = ({ on
               <h1 className="text-xl font-bold font-display text-foreground">
                 {currentUser.full_name || 'Customer'}
               </h1>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase brand-gradient text-white">
-                {currentUser.role}
-              </span>
             </div>
             <p className="text-xs text-muted-foreground">{currentUser.email}</p>
             {currentUser.phone && (
@@ -216,7 +215,6 @@ export const CustomerDashboardPage: React.FC<CustomerDashboardPageProps> = ({ on
         {[
           { id: 'profile', label: 'My Profile', icon: <User className="w-4 h-4" /> },
           { id: 'orders', label: `Orders (${myOrders.length})`, icon: <Package className="w-4 h-4" /> },
-          { id: 'wishlist', label: `Wishlist (${myWishlistProducts.length})`, icon: <Heart className="w-4 h-4" /> },
           { id: 'cart', label: `Cart (${cart.length})`, icon: <ShoppingBag className="w-4 h-4" /> },
           { id: 'notifications', label: `Notifications (${notifications.length})`, icon: <Bell className="w-4 h-4" /> },
           { id: 'reviews', label: `Reviews (${myReviews.length})`, icon: <Star className="w-4 h-4" /> },
@@ -276,6 +274,73 @@ export const CustomerDashboardPage: React.FC<CustomerDashboardPageProps> = ({ on
                 placeholder="+250 793 032 430"
                 className="w-full p-3 rounded-xl bg-secondary border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-brand"
               />
+            </div>
+
+            <div className="space-y-3 pt-2">
+              <label className="font-bold">Profile Picture</label>
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-full overflow-hidden border border-border bg-secondary shrink-0">
+                  <img
+                    src={avatarUrl || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=200&q=80'}
+                    alt="Profile"
+                    className="w-full h-full object-cover"
+                    style={{
+                      objectPosition: `${avatarPosX}% ${avatarPosY}%`,
+                      transform: `scale(${avatarZoom})`
+                    }}
+                  />
+                </div>
+                <div className="flex-1 space-y-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarUpload}
+                    disabled={isUploadingAvatar}
+                    className="text-xs text-foreground"
+                  />
+                  <span className="text-[10px] text-muted-foreground block">JPG, PNG or WEBP. Adjust position and zoom below.</span>
+                </div>
+              </div>
+
+              {avatarUrl && (
+                <div className="space-y-3 p-3 rounded-xl bg-secondary/50 border border-border">
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[10px] text-muted-foreground">
+                      <span>Horizontal</span>
+                      <span>Vertical</span>
+                    </div>
+                    <div className="flex gap-3">
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={avatarPosX}
+                        onChange={(e) => setAvatarPosX(Number(e.target.value))}
+                        className="flex-1"
+                      />
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={avatarPosY}
+                        onChange={(e) => setAvatarPosY(Number(e.target.value))}
+                        className="flex-1"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-muted-foreground">Zoom</span>
+                    <input
+                      type="range"
+                      min="100"
+                      max="300"
+                      value={Math.round(avatarZoom * 100)}
+                      onChange={(e) => setAvatarZoom(Number(e.target.value) / 100)}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -350,43 +415,6 @@ export const CustomerDashboardPage: React.FC<CustomerDashboardPageProps> = ({ on
                   >
                     <Truck className="w-3.5 h-3.5" />
                     <span>Track Live</span>
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {/* TAB 3: Wishlist */}
-      {activeTab === 'wishlist' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {myWishlistProducts.length === 0 ? (
-            <div className="col-span-full p-12 rounded-3xl bg-card border border-border text-center space-y-3">
-              <Heart className="w-10 h-10 text-muted-foreground mx-auto" />
-              <p className="font-bold text-sm text-foreground">Your wishlist is empty</p>
-              <p className="text-xs text-muted-foreground">Save items you love by clicking the heart icon on products.</p>
-            </div>
-          ) : (
-            myWishlistProducts.map((p) => (
-              <div key={p.id} className="p-4 rounded-3xl bg-card border border-border space-y-3 flex flex-col justify-between shadow-sm">
-                <img src={p.images[0]} alt={p.name} className="w-full aspect-square rounded-2xl object-cover bg-secondary" />
-                <div>
-                  <h4 className="font-bold text-xs line-clamp-1">{p.name}</h4>
-                  <span className="font-extrabold text-brand text-sm">{formatPrice(p.discount_price || p.price)}</span>
-                </div>
-                <div className="flex gap-2 pt-1">
-                  <button
-                    onClick={() => onNavigate(`/product/${p.id}`)}
-                    className="flex-1 py-2 rounded-xl brand-gradient text-white text-xs font-bold text-center"
-                  >
-                    View
-                  </button>
-                  <button
-                    onClick={() => toggleWishlist(p.id)}
-                    className="p-2 rounded-xl bg-secondary hover:bg-rose-500/10 text-muted-foreground hover:text-rose-500"
-                  >
-                    <Heart className="w-4 h-4 fill-rose-500 text-rose-500" />
                   </button>
                 </div>
               </div>

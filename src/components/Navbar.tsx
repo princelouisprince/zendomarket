@@ -4,7 +4,6 @@ import { useLanguage } from '../context/LanguageContext';
 import {
   Search,
   ShoppingCart,
-  Heart,
   Menu,
   X,
   Moon,
@@ -45,7 +44,6 @@ export const Navbar: React.FC<NavbarProps> = ({ currentRoute, onNavigate, onGoBa
     isSeller,
     logout,
     cartCount,
-    wishlist,
     products,
     categories,
     darkMode,
@@ -553,13 +551,6 @@ export const Navbar: React.FC<NavbarProps> = ({ currentRoute, onNavigate, onGoBa
                     >
                       <Package className="w-4 h-4 text-muted-foreground" />
                       <span>{t.common.myOrders}</span>
-                    </button>
-                    <button
-                      onClick={() => { setShowUserDropdown(false); onNavigate('/wishlist'); }}
-                      className="w-full flex items-center gap-2 p-2 rounded-xl hover:bg-secondary text-foreground text-xs font-semibold transition-colors cursor-pointer"
-                    >
-                      <Heart className="w-4 h-4 text-muted-foreground" />
-                      <span>{t.common.myWishlist}</span>
                     </button>
                     <button
                       onClick={() => { setShowUserDropdown(false); logout(); }}

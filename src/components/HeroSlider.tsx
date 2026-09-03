@@ -117,11 +117,10 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ onNavigate }) => {
           </div>
 
           {/* Centered Main Content Area */}
-          <div className="text-center space-y-6 sm:space-y-7 my-auto py-6 sm:py-8 animate-fade-in flex flex-col items-center">
+          <div className="text-center space-y-6 sm:space-y-7 my-auto py-4 animate-fade-in flex flex-col items-center">
             {/* Page Title / H1 */}
-            <h1 className="relative inline-block text-5xl sm:text-7xl md:text-8xl lg:text-9xl font-black font-outfit tracking-tight text-white drop-shadow-2xl select-none leading-[0.9]">
-              ZENDO
-              <span className="absolute -bottom-2 sm:-bottom-4 right-0 text-brand-light font-serif italic tracking-wide text-2xl sm:text-3xl md:text-4xl lg:text-5xl drop-shadow-[0_0_15px_rgba(0,255,255,0.35)]">Hub</span>
+            <h1 className="text-5xl sm:text-7xl md:text-8xl lg:text-9xl font-black font-display tracking-tight text-white drop-shadow-2xl select-none">
+              <span className="text-white">ZENDO</span> <span className="text-brand">HUB</span>
             </h1>
 
             {/* Tagline (subheading below H1) */}

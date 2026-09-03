@@ -30,7 +30,7 @@ export const AuthRequiredModal: React.FC<AuthRequiredModalProps> = ({ onNavigate
             Account Sign In Required
           </h3>
           <p className="text-xs text-muted-foreground leading-relaxed max-w-xs mx-auto">
-            Please sign in to your Zendo account or create a new profile to add items to your cart, save favorites, and complete orders.
+            Please sign in to your Zendo account or create a new profile to add items to your cart and complete orders.
           </p>
         </div>
 

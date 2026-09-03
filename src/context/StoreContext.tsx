@@ -85,7 +85,7 @@ interface StoreContextType {
   auditLogs: AuditLog[];
   reviews: Review[];
 
-  // Cart & Wishlist
+  // Cart
   cart: CartItem[];
   cartCount: number;
   cartTotal: number;
@@ -93,11 +93,6 @@ interface StoreContextType {
   removeFromCart: (productId: string) => void;
   updateCartQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
-
-  wishlist: string[];
-  wishlistCount: number;
-  toggleWishlist: (productId: string) => void;
-  isInWishlist: (productId: string) => boolean;
 
   // Modals & UI State
   quickViewProduct: Product | null;
@@ -182,9 +177,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
 
-  // Cart & Wishlist
+  // Cart
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [wishlist, setWishlist] = useState<string[]>([]);
 
   // UI States
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
@@ -317,13 +311,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, []);
 
-  // Hydrate user cart & wishlist from Supabase
-  const refreshUserCartAndWishlist = useCallback(async (userId: string) => {
+  // Hydrate user cart from Supabase
+  const refreshUserCart = useCallback(async (userId: string) => {
     if (!userId) return;
     try {
-      const [cartItems, wishlistProductIds, userNotifs] = await Promise.all([
+      const [cartItems, userNotifs] = await Promise.all([
         api.getUserCart(userId),
-        api.getUserWishlist(userId),
         api.fetchUserNotifications(userId)
       ]);
 
@@ -352,10 +345,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         });
       });
 
-      setWishlist(wishlistProductIds);
       setNotifications(userNotifs);
     } catch (err) {
-      console.error('[StoreContext] Error hydrating user cart/wishlist:', err);
+      console.error('[StoreContext] Error hydrating user cart:', err);
     }
   }, [products]);
 
@@ -410,12 +402,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setCurrentSeller(null);
       }
 
-      // Fetch user specific cart, wishlist, notifications
-      await refreshUserCartAndWishlist(sessionUser.id);
+      // Fetch user specific cart, notifications
+      await refreshUserCart(sessionUser.id);
     } catch (err) {
       console.error('[StoreContext] Error syncing auth session:', err);
     }
-  }, [sellers, refreshUserCartAndWishlist]);
+  }, [sellers, refreshUserCart]);
 
   // Initial load
   useEffect(() => {
@@ -584,7 +576,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setIsLoggedIn(false);
       setCurrentSeller(null);
       setCart([]);
-      setWishlist([]);
       setNotifications([]);
       showToast('Signed Out', 'You have been signed out of your account.', 'info');
     } catch (err: any) {
@@ -594,7 +585,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setIsLoggedIn(false);
       setCurrentSeller(null);
       setCart([]);
-      setWishlist([]);
       setNotifications([]);
     }
   };
@@ -753,35 +743,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return acc + price * item.quantity;
   }, 0);
 
-  // -------------------------------------------------------------
-  // Wishlist Actions (Persisted via Supabase)
-  // -------------------------------------------------------------
-
-  const toggleWishlist = async (productId: string) => {
-    try {
-      const isCurrentlySaved = wishlist.includes(productId);
-      if (isCurrentlySaved) {
-        setWishlist((prev) => prev.filter((id) => id !== productId));
-        showToast('Removed from Wishlist', 'Item removed.', 'info');
-      } else {
-        setWishlist((prev) => [...prev, productId]);
-        showToast('Saved to Wishlist ❤️', 'Item added to your saved list.', 'success');
-      }
-
-      if (currentUser.id) {
-        await api.toggleUserWishlistItem(currentUser.id, productId);
-      }
-    } catch (error) {
-      console.error('[StoreContext] Error toggling wishlist:', error);
-      showToast('Wishlist Error', 'Could not update wishlist. Please try again.', 'error');
-    }
-  };
-
-  const isInWishlist = (productId: string) => wishlist.includes(productId);
-  const wishlistCount = wishlist.length;
-
-  // -------------------------------------------------------------
-  // Product Mutations (Supabase Live)
+// -------------------------------------------------------------
+// Product Mutations (Supabase Live)
   // -------------------------------------------------------------
 
   const submitProduct = async (productData: any): Promise<Product | null> => {
@@ -1373,11 +1336,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         removeFromCart,
         updateCartQuantity,
         clearCart,
-
-        wishlist,
-        wishlistCount,
-        toggleWishlist,
-        isInWishlist,
 
         quickViewProduct,
         setQuickViewProduct,

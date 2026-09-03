@@ -6,7 +6,6 @@ import {
   ShieldCheck,
   Truck,
   RotateCcw,
-  Heart,
   ShoppingBag,
   Star,
   Share2,
@@ -28,8 +27,6 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ productId,
     products,
     sellers,
     addToCart,
-    toggleWishlist,
-    isInWishlist,
     reviews,
     addReview,
     showToast,
@@ -46,7 +43,6 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ productId,
 
   const product = products.find((p) => p.id === productId) || products[0];
   const seller = sellers.find((s) => s.id === product.seller_id);
-  const isSaved = isInWishlist(product.id);
   const effectivePrice = product.discount_price || product.price;
   const discountPercent = product.discount_price
     ? Math.round(((product.price - product.discount_price) / product.price) * 100)

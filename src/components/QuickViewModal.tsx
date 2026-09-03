@@ -1,20 +1,19 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { X, Heart, ShoppingBag, ShieldCheck, Star, Truck, ExternalLink, Globe } from 'lucide-react';
+import { X, ShoppingBag, ShieldCheck, Star, Truck, ExternalLink, Globe } from 'lucide-react';
 
 interface QuickViewModalProps {
   onNavigate?: (route: string) => void;
 }
 
 export const QuickViewModal: React.FC<QuickViewModalProps> = ({ onNavigate }) => {
-  const { quickViewProduct, setQuickViewProduct, addToCart, toggleWishlist, isInWishlist, formatPrice } = useStore();
+  const { quickViewProduct, setQuickViewProduct, addToCart, formatPrice } = useStore();
   const [selectedImg, setSelectedImg] = useState(0);
   const [quantity, setQuantity] = useState(1);
 
   if (!quickViewProduct) return null;
 
   const product = quickViewProduct;
-  const isSaved = isInWishlist(product.id);
   const price = product.discount_price || product.price;
 
   const handleFullDetails = () => {
