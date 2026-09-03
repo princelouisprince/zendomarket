@@ -764,7 +764,7 @@ export const translations: Record<Language, Translations> = {
       searchPlaceholder: 'Search products, brands and sellers…',
     },
     hero: {
-      title: 'ZENDO',
+      title: 'ZENDO Hub',
       subtitle: 'Your digital gateway to products, suppliers and markets.',
       punchline: 'Buy locally. Sell online. Source across Africa.',
       shopProducts: 'Shop Products',
@@ -1377,7 +1377,7 @@ export const translations: Record<Language, Translations> = {
       searchPlaceholder: 'Shakisha ibicuruzwa, brands no gucuruza…',
     },
     hero: {
-      title: 'ZENDO',
+      title: 'ZENDO Hub',
       subtitle: "Irembo ryawe rya digitale ku bicuruzwa, abagemura n'amasoko.",
       punchline: 'Gura hafi. Gurisha kuri murandasi. Shakira muri Afurika yose.',
       shopProducts: 'Gura Ibicuruzwa',
@@ -1988,7 +1988,7 @@ export const translations: Record<Language, Translations> = {
       searchPlaceholder: 'Rechercher produits, marques et vendeurs…',
     },
     hero: {
-      title: 'ZENDO',
+      title: 'ZENDO Hub',
       subtitle: 'Votre passerelle numérique vers les produits, les fournisseurs et les marchés.',
       punchline: 'Achetez localement. Vendez en ligne. Sourcez à travers l\'Afrique.',
       shopProducts: 'Acheter des produits',
@@ -2601,7 +2601,7 @@ export const translations: Record<Language, Translations> = {
       searchPlaceholder: 'Tafuta bidhaa, brands na wauzaji…',
     },
     hero: {
-      title: 'ZENDO',
+      title: 'ZENDO Hub',
       subtitle: 'Lango lako la kidijitali kwa bidhaa, wasambazaji na masoko.',
       punchline: 'Nunua ndani ya nchi. Uza mtandaoni. Tafuta kote Afrika.',
       shopProducts: 'Nunua Bidhaa',
